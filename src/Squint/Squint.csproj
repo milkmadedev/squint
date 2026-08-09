@@ -1,0 +1,43 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <!-- required by the source-generated [LibraryImport] p/invokes -->
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <AssemblyName>Squint</AssemblyName>
+    <RootNamespace>Squint</RootNamespace>
+    <ApplicationIcon>Assets\app.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <Version>1.0.0</Version>
+    <Product>Squint</Product>
+    <Company>Squint</Company>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <EnableDefaultPageItems>true</EnableDefaultPageItems>
+    <!-- WFO0003: WinForms wants DPI configured via its own API, but this is a WPF app —
+         the manifest is the correct place for it here. -->
+    <NoWarn>$(NoWarn);CA1416;WFO0003</NoWarn>
+  </PropertyGroup>
+
+  <!-- WinForms is referenced only for NotifyIcon + Screen. Drop its global usings so
+       Clipboard/MessageBox/Application/Cursor resolve to the WPF types everywhere. -->
+  <ItemGroup>
+    <Using Remove="System.Windows.Forms" />
+    <Using Remove="System.Drawing" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Assets\verified.png" />
+    <Resource Include="Assets\caution.png" />
+    <Resource Include="Assets\suspect.png" />
+    <Resource Include="Assets\processing.png" />
+    <Resource Include="Assets\app.png" />
+    <Resource Include="Assets\app.ico" />
+    <Resource Include="Assets\app-paused.ico" />
+  </ItemGroup>
+
+</Project>

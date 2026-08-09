@@ -1,0 +1,9 @@
+# Windows-only project: normalise to CRLF in the working tree so the .ps1 and .iss files
+# behave, and stop Git warning on every add.
+* text=auto eol=crlf
+
+# Never touched by line-ending conversion.
+*.png binary
+*.ico binary
+*.bmp binary
+*.exe binary
