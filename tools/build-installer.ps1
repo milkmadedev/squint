@@ -32,7 +32,11 @@ param(
     # Every source file's modification time is recorded inside the installer, so a rebuilt
     # payload would change the output. Pinning it is what makes the build reproducible.
     # Override via SOURCE_DATE_EPOCH if you want to match some other build exactly.
-    [datetime]$SourceDate = [datetime]::SpecifyKind('2020-01-01T00:00:00', 'Utc')
+    [datetime]$SourceDate = [datetime]::SpecifyKind('2020-01-01T00:00:00', 'Utc'),
+
+    # Point at a specific ISCC.exe. Reproducing a published release needs the same Inno
+    # version it was built with, which may not be the one on your PATH.
+    [string]$Iscc
 )
 
 $ErrorActionPreference = 'Stop'
@@ -55,11 +59,17 @@ if (-not (Get-Command dotnet -ErrorAction SilentlyContinue)) {
     throw 'The .NET SDK is required to build. https://dotnet.microsoft.com/download'
 }
 
-$iscc = @(
-    "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe",
-    "$env:ProgramFiles\Inno Setup 6\ISCC.exe",
-    "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
-) | Where-Object { Test-Path $_ } | Select-Object -First 1
+if ($Iscc) {
+    if (-not (Test-Path $Iscc)) { throw "No ISCC.exe at $Iscc" }
+    $iscc = $Iscc
+}
+else {
+    $iscc = @(
+        "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe",
+        "$env:ProgramFiles\Inno Setup 6\ISCC.exe",
+        "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+    ) | Where-Object { Test-Path $_ } | Select-Object -First 1
+}
 
 if (-not $iscc) {
     throw 'Inno Setup 6 not found. Install it with:  winget install JRSoftware.InnoSetup'
