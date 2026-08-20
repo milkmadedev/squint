@@ -79,6 +79,10 @@ if (-not $iscc) {
 Step 'Publishing self-contained (takes a minute)...'
 Remove-Item $payload -Recurse -Force -ErrorAction SilentlyContinue
 
+# PathMap rewrites the repo's absolute path to a fixed prefix inside the compiled assembly.
+# Without it a checkout at C:\dev\squint and one at D:\squint\squint produce different
+# bytes, which is exactly why a local build did not match CI.
+#
 # Single file: the whole app plus the .NET runtime collapse into one Squint.exe.
 # Compression keeps the installed size sane; it self-extracts natives on first run.
 & dotnet publish $project -c Release -r $Runtime --self-contained true `
@@ -89,6 +93,7 @@ Remove-Item $payload -Recurse -Force -ErrorAction SilentlyContinue
     -p:Version=$Version `
     -p:Deterministic=true `
     -p:ContinuousIntegrationBuild=true `
+    "-p:PathMap=$root\=/_/" `
     --source $NugetSource `
     -o $payload --nologo -v quiet
 if ($LASTEXITCODE -ne 0) { throw "Publish failed (exit $LASTEXITCODE)." }
