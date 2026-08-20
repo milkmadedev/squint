@@ -22,6 +22,10 @@ on:
         description: 'Version to build and release, without the v (e.g. 1.0.1)'
         required: true
 
+env:
+  DOTNET_VERSION: '10.0.201'
+  INNO_VERSION: '6.7.1'
+
 permissions:
   contents: write
 
@@ -36,12 +40,12 @@ jobs:
       - name: Install .NET
         uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: '10.0.201'
+          dotnet-version: ${{ env.DOTNET_VERSION }}
 
       - name: Install Inno Setup
         # Pinned: reproducing a release byte-for-byte requires the same compiler, and
         # 'latest' would silently change the output the day Inno ships an update.
-        run: choco install innosetup --version=6.7.1 --no-progress -y
+        run: choco install innosetup --version=${{ env.INNO_VERSION }} --no-progress -y
 
       - name: Work out the version
         id: ver
@@ -104,22 +108,12 @@ jobs:
         shell: pwsh
         run: |
           # Reproducing these bytes needs the same compilers, so say exactly which were used.
-          # $env:ProgramFiles(x86) does not parse - the parentheses need brace syntax.
-          $iscc = @(
-            "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
-            "$env:ProgramFiles\Inno Setup 6\ISCC.exe"
-            "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe"
-          ) | Where-Object { Test-Path $_ } | Select-Object -First 1
-
-          if (-not $iscc) { throw 'Could not find ISCC.exe to read the Inno version.' }
-          $inno = (& $iscc 2>&1 | Select-String 'Compiler engine version:\s*(.+)').Matches.Groups[1].Value.Trim()
-
           @(
             "Squint ${{ steps.ver.outputs.version }}"
             "commit:      ${{ github.sha }}"
             "built by:    GitHub Actions run ${{ github.run_id }}"
             ".NET SDK:    $(dotnet --version)"
-            "Inno Setup:  $inno"
+            "Inno Setup:  ${{ env.INNO_VERSION }}"
             ""
             "Rebuild with the same two versions to reproduce SHA256SUMS.txt exactly."
           ) -join "`n" | Set-Content dist/BUILDINFO.txt -Encoding ascii
