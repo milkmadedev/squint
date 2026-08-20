@@ -19,37 +19,51 @@ All [releases](https://github.com/milkmadedev/squint/releases) · licensed
 
 ## Why Windows warns, and how to verify the download
 
-Squint is not code-signed. A signing certificate runs a few hundred dollars a year, the kind that
+Squint is not code-signed. A certificate costs a few hundred dollars a year, the kind that
 actually clears SmartScreen straight away (EV) costs more, and since 2023 they have to live on a
 hardware token. I am one person writing a free tool for myself and my girlfriend, so I am not
-paying that, and SmartScreen flags anything it has not seen before regardless.
+paying that. SmartScreen warns about anything it has not seen before regardless, so the warning
+tells you nothing either way.
 
-So the warning is not evidence of anything, in either direction. Rather than asking you to trust
-it, here is what you can check:
+Instead of asking you to trust the file, here is how to check it.
 
-**The build is not done on my machine.** Every release is compiled by GitHub Actions on a clean
-runner, from the tagged commit, using
-[`.github/workflows/release.yml`](.github/workflows/release.yml). You can read that workflow, read
-the source it builds, and see the run that produced your file under
-[Actions](https://github.com/milkmadedev/squint/actions).
-
-**Confirm your download matches that build.** Run this in PowerShell, in the folder holding the
-installer:
+**1. Get the hash of what you downloaded.** In PowerShell, in the folder holding the installer:
 
 ```powershell
-$h=(Get-FileHash .\Squint-Setup.exe -Algorithm SHA256).Hash.ToLower(); $e=((irm https://github.com/milkmadedev/squint/releases/latest/download/SHA256SUMS.txt) -split '\s+')[0]; if ($h -eq $e) { "MATCH  $h" } else { "MISMATCH  yours=$h  expected=$e" }
+Get-FileHash .\Squint-Setup.exe
 ```
 
-It prints `MATCH` when your copy is byte-for-byte the file the workflow published. A mismatch
-means the download was corrupted or tampered with, so delete it.
+**2. Compare it to
+[SHA256SUMS.txt](https://github.com/milkmadedev/squint/releases/latest/download/SHA256SUMS.txt).**
+That file is written by GitHub Actions during the release, not by me. If the two match, your copy
+is exactly what the workflow published.
 
-Just want the hash? `(Get-FileHash .\Squint-Setup.exe -Algorithm SHA256).Hash` — compare it to
-`SHA256SUMS.txt` on the [release](https://github.com/milkmadedev/squint/releases/latest).
+### The build is reproducible
 
-**Or read it before you run it.** The source is all here, it is GPLv3, and you can build the
-installer yourself with the command in the next section. If you would rather scan it, the file is
-small enough to upload to [VirusTotal](https://www.virustotal.com/) — which is, after all, one of
-the three services Squint uses.
+The checksum only proves your download is intact. What makes it mean something is that anyone can
+regenerate the same file from source:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File tools\build-installer.ps1 -Version 1.0.1
+Get-FileHash .\dist\Squint-Setup.exe
+```
+
+Build the tagged commit yourself and you get **byte-for-byte the same installer**, so the same
+hash. Nothing time-based or machine-specific goes into it: source-file timestamps are excluded
+from the package, the .NET build is deterministic, and paths are fixed.
+
+Every release enforces this. The workflow builds twice and refuses to publish unless both builds
+are identical, so a release that cannot be reproduced never ships. You can read
+[`release.yml`](.github/workflows/release.yml) and see the run that produced your file under
+[Actions](https://github.com/milkmadedev/squint/actions).
+
+One caveat, since it should be said plainly: reproducible means *same toolchain, same bytes*. A
+different .NET SDK or Inno Setup version can legitimately produce a different file. Match the
+versions the workflow uses if you want an exact comparison.
+
+**Or just read it.** The source is all here under GPLv3. If you would rather scan the binary,
+upload it to [VirusTotal](https://www.virustotal.com/) — which is, after all, one of the three
+services Squint uses.
 
 ## Building it yourself
 

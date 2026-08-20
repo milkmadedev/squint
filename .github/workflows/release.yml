@@ -64,6 +64,26 @@ jobs:
         shell: pwsh
         run: ./tools/build-installer.ps1 -Version ${{ steps.ver.outputs.version }}
 
+      - name: Prove the build is reproducible
+        shell: pwsh
+        run: |
+          # Build a second time from the same commit and require identical bytes. The checksum
+          # below is only worth something if the build is reproducible, so this gate runs before
+          # anything is published: a release that cannot be reproduced never ships.
+          $first = (Get-FileHash dist/Squint-Setup.exe -Algorithm SHA256).Hash.ToLower()
+          Move-Item dist/Squint-Setup.exe "$env:RUNNER_TEMP/first.exe" -Force
+
+          ./tools/build-installer.ps1 -Version ${{ steps.ver.outputs.version }}
+          if (-not (Test-Path dist/Squint-Setup.exe)) { throw 'Second build produced nothing.' }
+
+          $second = (Get-FileHash dist/Squint-Setup.exe -Algorithm SHA256).Hash.ToLower()
+
+          if ($first -ne $second) {
+            throw "Build is not reproducible.`n  first:  $first`n  second: $second"
+          }
+
+          Write-Host "Reproducible: two builds, identical bytes ($first)"
+
       - name: Write SHA256SUMS.txt
         shell: pwsh
         run: |

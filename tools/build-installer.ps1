@@ -24,7 +24,15 @@ param(
     [string]$Runtime = 'win-x64',
 
     # Runtime packs only live on nuget.org; passed per-invocation so the global config is untouched.
-    [string]$NugetSource = 'https://api.nuget.org/v3/index.json'
+    [string]$NugetSource = 'https://api.nuget.org/v3/index.json',
+
+    # Leaves the published payload in place so reproducibility can be diffed layer by layer.
+    [switch]$KeepPayload,
+
+    # Every source file's modification time is recorded inside the installer, so a rebuilt
+    # payload would change the output. Pinning it is what makes the build reproducible.
+    # Override via SOURCE_DATE_EPOCH if you want to match some other build exactly.
+    [datetime]$SourceDate = [datetime]::SpecifyKind('2020-01-01T00:00:00', 'Utc')
 )
 
 $ErrorActionPreference = 'Stop'
@@ -33,7 +41,9 @@ $project     = Join-Path $root 'src\Squint\Squint.csproj'
 $assets      = Join-Path $root 'src\Squint\Assets'
 $installerDir = Join-Path $root 'installer'
 $outDir      = Join-Path $root 'dist'
-$payload     = Join-Path $env:TEMP "Squint-payload-$PID"
+# Fixed, not $PID-suffixed: the path leaks into the publish output, so varying it makes the
+# build unreproducible.
+$payload     = Join-Path $env:TEMP 'Squint-payload'
 
 function Step($m) { Write-Host "  $m" -ForegroundColor Cyan }
 function Ok($m)   { Write-Host "  $m" -ForegroundColor Green }
@@ -67,6 +77,8 @@ Remove-Item $payload -Recurse -Force -ErrorAction SilentlyContinue
     -p:EnableCompressionInSingleFile=true `
     -p:DebugType=none `
     -p:Version=$Version `
+    -p:Deterministic=true `
+    -p:ContinuousIntegrationBuild=true `
     --source $NugetSource `
     -o $payload --nologo -v quiet
 if ($LASTEXITCODE -ne 0) { throw "Publish failed (exit $LASTEXITCODE)." }
@@ -104,6 +116,22 @@ foreach ($name in 'verified', 'caution', 'suspect') {
 }
 Ok 'Artwork written.'
 
+# ---------------------------------------------------------------- pin timestamps
+# Inno stores the last-write time of every file it packs. Left alone, each rebuild produces
+# a different installer even when every byte of input is otherwise identical.
+if ($env:SOURCE_DATE_EPOCH) {
+    $SourceDate = [datetimeoffset]::FromUnixTimeSeconds([long]$env:SOURCE_DATE_EPOCH).UtcDateTime
+}
+
+Step "Pinning input timestamps to $($SourceDate.ToString('u'))"
+$stamped = 0
+foreach ($file in @(Get-ChildItem $payload -Recurse -File) + @(Get-ChildItem $installerDir -File -Filter *.bmp)) {
+    $file.LastWriteTimeUtc = $SourceDate
+    $file.CreationTimeUtc = $SourceDate
+    $stamped++
+}
+Ok "Pinned $stamped file(s)."
+
 # ---------------------------------------------------------------- compile
 Step 'Compiling installer...'
 New-Item -ItemType Directory -Force -Path $outDir | Out-Null
@@ -117,7 +145,7 @@ New-Item -ItemType Directory -Force -Path $outDir | Out-Null
 
 if ($LASTEXITCODE -ne 0) { throw "Inno Setup failed (exit $LASTEXITCODE)." }
 
-Remove-Item $payload -Recurse -Force -ErrorAction SilentlyContinue
+if (-not $KeepPayload) { Remove-Item $payload -Recurse -Force -ErrorAction SilentlyContinue }
 
 $exe = Join-Path $outDir 'Squint-Setup.exe'
 $mb = [math]::Round((Get-Item $exe).Length / 1MB, 1)

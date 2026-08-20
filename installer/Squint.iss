@@ -43,6 +43,10 @@ SetupIconFile={#IconFile}
 Compression=lzma2/max
 SolidCompression=yes
 
+; Record packed-file timestamps in UTC. Without this the recorded value depends on the
+; build machine's timezone, so CI and a local build would never produce the same bytes.
+TimeStampsInUTC=yes
+
 ; Smallest wizard that still teaches it: Welcome, How it works, API keys, Finish.
 WizardStyle=modern
 WizardSizePercent=120
@@ -79,12 +83,15 @@ Type: files; Name: "{app}\uninstall.ps1"
 Type: filesandordirs; Name: "{app}\app"
 
 [Files]
-Source: "{#PayloadDir}\{#AppExe}"; DestDir: "{app}"; Flags: ignoreversion
+; notimestamp: don't store the source file's modification time in the installer. That time is
+; what made two builds of identical input produce different bytes. Mutually exclusive with
+; touch, and it already gives the installed file a sensible time.
+Source: "{#PayloadDir}\{#AppExe}"; DestDir: "{app}"; Flags: ignoreversion notimestamp
 
 ; Wizard artwork, unpacked to temp only.
-Source: "verified.bmp"; Flags: dontcopy
-Source: "caution.bmp";  Flags: dontcopy
-Source: "suspect.bmp";  Flags: dontcopy
+Source: "verified.bmp"; Flags: dontcopy notimestamp
+Source: "caution.bmp";  Flags: dontcopy notimestamp
+Source: "suspect.bmp";  Flags: dontcopy notimestamp
 
 [Icons]
 Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExe}"
