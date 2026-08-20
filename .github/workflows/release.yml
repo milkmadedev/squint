@@ -104,8 +104,15 @@ jobs:
         shell: pwsh
         run: |
           # Reproducing these bytes needs the same compilers, so say exactly which were used.
-          $inno = (& "$env:ProgramFiles(x86)\Inno Setup 6\ISCC.exe" 2>&1 |
-                   Select-String 'Compiler engine version:\s*(.+)').Matches.Groups[1].Value.Trim()
+          # $env:ProgramFiles(x86) does not parse - the parentheses need brace syntax.
+          $iscc = @(
+            "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+            "$env:ProgramFiles\Inno Setup 6\ISCC.exe"
+            "$env:LOCALAPPDATA\Programs\Inno Setup 6\ISCC.exe"
+          ) | Where-Object { Test-Path $_ } | Select-Object -First 1
+
+          if (-not $iscc) { throw 'Could not find ISCC.exe to read the Inno version.' }
+          $inno = (& $iscc 2>&1 | Select-String 'Compiler engine version:\s*(.+)').Matches.Groups[1].Value.Trim()
 
           @(
             "Squint ${{ steps.ver.outputs.version }}"
