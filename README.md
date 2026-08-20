@@ -41,28 +41,34 @@ is exactly what the workflow published.
 ### The build is reproducible
 
 The checksum only proves your download is intact. What makes it mean something is that anyone can
-regenerate the same file from source:
+regenerate the same file from source and get the same hash.
+
+That is verified, not asserted. This release was built on GitHub's runners; rebuilding it on a
+different machine, different drive, different folder produced byte-identical output. To do it
+yourself, install **.NET SDK 10.0.201** and **Inno Setup 6.7.1**, then:
 
 ```powershell
-powershell -ExecutionPolicy Bypass -File tools\build-installer.ps1 -Version 1.0.1
+git clone https://github.com/milkmadedev/squint && cd squint
+git checkout v1.0.3
+powershell -ExecutionPolicy Bypass -File tools\build-installer.ps1 -Version 1.0.3
 Get-FileHash .\dist\Squint-Setup.exe
 ```
 
-Build the tagged commit yourself and you get **byte-for-byte the same installer**, so the same
-hash. Nothing time-based or machine-specific goes into it: source-file timestamps are excluded
-from the package, the .NET build is deterministic, and paths are fixed.
+That hash matches `SHA256SUMS.txt` on the release. If you keep several Inno versions around,
+point the build at the right one with `-Iscc "C:\Path\To\Inno Setup 6\ISCC.exe"`.
 
-Every release enforces this. The workflow builds twice and refuses to publish unless both builds
-are identical, so a release that cannot be reproduced never ships. You can read
-[`release.yml`](.github/workflows/release.yml) and see the run that produced your file under
+Getting there meant removing everything machine-specific: packed-file timestamps are dropped
+(Inno's `notimestamp`), the remaining ones are UTC, the .NET build is deterministic, and
+`PathMap` rewrites the repo's absolute path so a checkout in any folder compiles identically.
+
+Every release enforces it. The workflow builds twice and refuses to publish unless both builds
+are identical, so a release that cannot be reproduced never ships. Read
+[`release.yml`](.github/workflows/release.yml), and find the run that produced your file under
 [Actions](https://github.com/milkmadedev/squint/actions).
 
-Said plainly, because it matters: reproducible means *same toolchain, same bytes*. A different
-.NET SDK or Inno Setup version legitimately produces a different file, so both are pinned:
-**.NET SDK 10.0.201** (in `global.json`) and **Inno Setup 6.7.1**. Every release also ships a
-`BUILDINFO.txt` naming the exact versions and commit it was built from. Match those two and you
-get the published hash; use anything else and you will not, which is expected rather than a
-warning sign.
+Both toolchain versions are pinned — the SDK in `global.json`, Inno in the workflows — and every
+release ships a `BUILDINFO.txt` naming the versions and commit it came from. Build with a
+different SDK or Inno and you will get a different hash. That is expected, not a warning sign.
 
 **Or just read it.** The source is all here under GPLv3. If you would rather scan the binary,
 upload it to [VirusTotal](https://www.virustotal.com/) — which is, after all, one of the three
