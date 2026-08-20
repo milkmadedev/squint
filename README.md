@@ -57,9 +57,12 @@ are identical, so a release that cannot be reproduced never ships. You can read
 [`release.yml`](.github/workflows/release.yml) and see the run that produced your file under
 [Actions](https://github.com/milkmadedev/squint/actions).
 
-One caveat, since it should be said plainly: reproducible means *same toolchain, same bytes*. A
-different .NET SDK or Inno Setup version can legitimately produce a different file. Match the
-versions the workflow uses if you want an exact comparison.
+Said plainly, because it matters: reproducible means *same toolchain, same bytes*. A different
+.NET SDK or Inno Setup version legitimately produces a different file, so both are pinned:
+**.NET SDK 10.0.201** (in `global.json`) and **Inno Setup 6.7.1**. Every release also ships a
+`BUILDINFO.txt` naming the exact versions and commit it was built from. Match those two and you
+get the published hash; use anything else and you will not, which is expected rather than a
+warning sign.
 
 **Or just read it.** The source is all here under GPLv3. If you would rather scan the binary,
 upload it to [VirusTotal](https://www.virustotal.com/) — which is, after all, one of the three
@@ -74,7 +77,9 @@ powershell -ExecutionPolicy Bypass -File tools\build-installer.ps1
 The script produces `dist\Squint-Setup.exe`, one file of about 61 MB, and that file is everything
 you send.
 
-You need the .NET SDK and Inno Setup 6 (`winget install JRSoftware.InnoSetup`) on your machine.
+You need .NET SDK 10.0.201 (pinned in `global.json`) and Inno Setup 6.7.1
+(`choco install innosetup --version=6.7.1`) to reproduce a release exactly; any recent pair builds
+a working installer, it just will not match the published hash.
 The recipient needs nothing: the build publishes self-contained and single-file, so .NET rides
 inside `Squint.exe` and there is no runtime to install.
 

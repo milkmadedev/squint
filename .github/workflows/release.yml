@@ -36,10 +36,12 @@ jobs:
       - name: Install .NET
         uses: actions/setup-dotnet@v5
         with:
-          dotnet-version: '10.0.x'
+          dotnet-version: '10.0.201'
 
       - name: Install Inno Setup
-        run: choco install innosetup --no-progress -y
+        # Pinned: reproducing a release byte-for-byte requires the same compiler, and
+        # 'latest' would silently change the output the day Inno ships an update.
+        run: choco install innosetup --version=6.7.1 --no-progress -y
 
       - name: Work out the version
         id: ver
@@ -98,6 +100,24 @@ jobs:
           Write-Host "SHA256: $hash"
           "### Squint ${{ steps.ver.outputs.version }}`n`nSHA256 of ``Squint-Setup.exe```n`n``$hash``" >> $env:GITHUB_STEP_SUMMARY
 
+      - name: Record the toolchain
+        shell: pwsh
+        run: |
+          # Reproducing these bytes needs the same compilers, so say exactly which were used.
+          $inno = (& "$env:ProgramFiles(x86)\Inno Setup 6\ISCC.exe" 2>&1 |
+                   Select-String 'Compiler engine version:\s*(.+)').Matches.Groups[1].Value.Trim()
+
+          @(
+            "Squint ${{ steps.ver.outputs.version }}"
+            "commit:      ${{ github.sha }}"
+            "built by:    GitHub Actions run ${{ github.run_id }}"
+            ".NET SDK:    $(dotnet --version)"
+            "Inno Setup:  $inno"
+            ""
+            "Rebuild with the same two versions to reproduce SHA256SUMS.txt exactly."
+          ) -join "`n" | Set-Content dist/BUILDINFO.txt -Encoding ascii
+          Get-Content dist/BUILDINFO.txt
+
       - name: Publish release
         shell: pwsh
         env:
@@ -112,5 +132,5 @@ jobs:
             if ($LASTEXITCODE -ne 0) { throw 'Could not create the release.' }
           }
 
-          gh release upload $tag dist/Squint-Setup.exe dist/SHA256SUMS.txt --clobber
+          gh release upload $tag dist/Squint-Setup.exe dist/SHA256SUMS.txt dist/BUILDINFO.txt --clobber
           if ($LASTEXITCODE -ne 0) { throw 'Could not upload the release assets.' }
