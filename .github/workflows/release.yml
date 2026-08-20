@@ -69,9 +69,11 @@ jobs:
         run: |
           $hash = (Get-FileHash dist/Squint-Setup.exe -Algorithm SHA256).Hash.ToLower()
 
-          # Standard sha256sum format (two spaces), so `sha256sum -c` works as-is.
-          "$hash  Squint-Setup.exe" | Set-Content dist/SHA256SUMS.txt -Encoding ascii -NoNewline
-          "" | Add-Content dist/SHA256SUMS.txt -Encoding ascii
+          # Standard sha256sum format: two spaces, and a trailing LF rather than CRLF.
+          # Set-Content would write CRLF, which makes `sha256sum -c` look for a filename with a
+          # stray carriage return on the end and fail.
+          $line = "$hash  Squint-Setup.exe`n"
+          [System.IO.File]::WriteAllText("$PWD/dist/SHA256SUMS.txt", $line, (New-Object System.Text.UTF8Encoding($false)))
 
           Write-Host "SHA256: $hash"
           "### Squint ${{ steps.ver.outputs.version }}`n`nSHA256 of ``Squint-Setup.exe```n`n``$hash``" >> $env:GITHUB_STEP_SUMMARY
