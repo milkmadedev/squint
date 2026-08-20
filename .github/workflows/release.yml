@@ -1,0 +1,94 @@
+# Squint - copied-link safety checker for Windows.
+# Copyright (C) 2026 milkmade
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# Builds the installer on a clean GitHub runner from the tagged commit and publishes it with a
+# SHA256 checksum.
+#
+# This is the substitute for code signing. Squint has no certificate, so instead of "trust the
+# binary because it is signed", the claim is: this exact file was produced by a public runner,
+# from public source, by a workflow you can read. The checksum ties the download to that run.
+#
+# Push a tag to release:   git tag v1.0.1 && git push origin v1.0.1
+
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to build and release, without the v (e.g. 1.0.1)'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress -y
+
+      - name: Work out the version
+        id: ver
+        shell: pwsh
+        run: |
+          if ('${{ github.ref_type }}' -eq 'tag') {
+            $version = '${{ github.ref_name }}' -replace '^v', ''
+          }
+          else {
+            $version = '${{ inputs.version }}' -replace '^v', ''
+          }
+
+          if ($version -notmatch '^\d+\.\d+\.\d+$') {
+            throw "Version '$version' should look like 1.0.1"
+          }
+
+          "version=$version" >> $env:GITHUB_OUTPUT
+          "tag=v$version" >> $env:GITHUB_OUTPUT
+          Write-Host "Building $version"
+
+      - name: Build installer
+        shell: pwsh
+        run: ./tools/build-installer.ps1 -Version ${{ steps.ver.outputs.version }}
+
+      - name: Write SHA256SUMS.txt
+        shell: pwsh
+        run: |
+          $hash = (Get-FileHash dist/Squint-Setup.exe -Algorithm SHA256).Hash.ToLower()
+
+          # Standard sha256sum format (two spaces), so `sha256sum -c` works as-is.
+          "$hash  Squint-Setup.exe" | Set-Content dist/SHA256SUMS.txt -Encoding ascii -NoNewline
+          "" | Add-Content dist/SHA256SUMS.txt -Encoding ascii
+
+          Write-Host "SHA256: $hash"
+          "### Squint ${{ steps.ver.outputs.version }}`n`nSHA256 of ``Squint-Setup.exe```n`n``$hash``" >> $env:GITHUB_STEP_SUMMARY
+
+      - name: Publish release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tag = '${{ steps.ver.outputs.tag }}'
+
+          # Tagging by hand and releasing from the UI are both fine; create only if missing.
+          gh release view $tag 2>$null | Out-Null
+          if ($LASTEXITCODE -ne 0) {
+            gh release create $tag --title "Squint ${{ steps.ver.outputs.version }}" --generate-notes
+            if ($LASTEXITCODE -ne 0) { throw 'Could not create the release.' }
+          }
+
+          gh release upload $tag dist/Squint-Setup.exe dist/SHA256SUMS.txt --clobber
+          if ($LASTEXITCODE -ne 0) { throw 'Could not upload the release assets.' }

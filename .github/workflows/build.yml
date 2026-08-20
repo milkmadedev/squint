@@ -1,0 +1,56 @@
+# Squint - copied-link safety checker for Windows.
+# Copyright (C) 2026 milkmade
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+# Proves main still compiles into a working installer. The release workflow does the same
+# build, so breakage shows up here rather than when you try to cut a version.
+#
+# Only first-party actions/* are used. Squint is a security tool, so every third-party action
+# would be one more thing a user has to trust in the chain that produces their binary.
+
+name: Build
+
+on:
+  push:
+    branches: [main]
+    paths-ignore: ['**.md', 'LICENSE', '.gitignore', '.gitattributes']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  installer:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Install Inno Setup
+        run: choco install innosetup --no-progress -y
+
+      - name: Build installer
+        shell: pwsh
+        run: ./tools/build-installer.ps1 -Version 0.0.${{ github.run_number }}
+
+      - name: Checksum
+        shell: pwsh
+        run: |
+          $hash = (Get-FileHash dist/Squint-Setup.exe -Algorithm SHA256).Hash.ToLower()
+          Write-Host "SHA256: $hash"
+          "### Installer`n`n``$hash``" >> $env:GITHUB_STEP_SUMMARY
+
+      - name: Upload for inspection
+        uses: actions/upload-artifact@v4
+        with:
+          name: Squint-Setup-build-${{ github.run_number }}
+          path: dist/Squint-Setup.exe
+          retention-days: 14

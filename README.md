@@ -8,12 +8,48 @@ The name is what you do at a suspicious URL, and it is also one of the checks:
 
 ### ⬇ [Download Squint-Setup.exe](https://github.com/milkmadedev/squint/releases/latest/download/Squint-Setup.exe)
 
-One file, about 61 MB. Run it: no admin password, no prerequisites, nothing to unzip. Windows
-shows *"Windows protected your PC"* because the installer is not code-signed, so click
-**More info → Run anyway**.
+One file, about 61 MB. That link gives you the installer only, not the source, so there is
+nothing to clone or build. Run it: no admin password, no prerequisites, nothing to unzip.
+
+Windows shows *"Windows protected your PC"*, so click **More info → Run anyway**. That warning is
+expected, and the next section explains why and how to check the file yourself.
 
 All [releases](https://github.com/milkmadedev/squint/releases) · licensed
 [GPL-3.0-or-later](LICENSE)
+
+## Why Windows warns, and how to verify the download
+
+Squint is not code-signed. A signing certificate runs a few hundred dollars a year, the kind that
+actually clears SmartScreen straight away (EV) costs more, and since 2023 they have to live on a
+hardware token. I am one person writing a free tool for myself and my girlfriend, so I am not
+paying that, and SmartScreen flags anything it has not seen before regardless.
+
+So the warning is not evidence of anything, in either direction. Rather than asking you to trust
+it, here is what you can check:
+
+**The build is not done on my machine.** Every release is compiled by GitHub Actions on a clean
+runner, from the tagged commit, using
+[`.github/workflows/release.yml`](.github/workflows/release.yml). You can read that workflow, read
+the source it builds, and see the run that produced your file under
+[Actions](https://github.com/milkmadedev/squint/actions).
+
+**Confirm your download matches that build.** Run this in PowerShell, in the folder holding the
+installer:
+
+```powershell
+$h=(Get-FileHash .\Squint-Setup.exe -Algorithm SHA256).Hash.ToLower(); $e=((irm https://github.com/milkmadedev/squint/releases/latest/download/SHA256SUMS.txt) -split '\s+')[0]; if ($h -eq $e) { "MATCH  $h" } else { "MISMATCH  yours=$h  expected=$e" }
+```
+
+It prints `MATCH` when your copy is byte-for-byte the file the workflow published. A mismatch
+means the download was corrupted or tampered with, so delete it.
+
+Just want the hash? `(Get-FileHash .\Squint-Setup.exe -Algorithm SHA256).Hash` — compare it to
+`SHA256SUMS.txt` on the [release](https://github.com/milkmadedev/squint/releases/latest).
+
+**Or read it before you run it.** The source is all here, it is GPLv3, and you can build the
+installer yourself with the command in the next section. If you would rather scan it, the file is
+small enough to upload to [VirusTotal](https://www.virustotal.com/) — which is, after all, one of
+the three services Squint uses.
 
 ## Building it yourself
 
@@ -36,8 +72,9 @@ The wizard runs three screens: **how it works** (the three verdicts, with icons)
 (three fields, each with a "Get key" button that opens the right signup page), then it installs and
 starts. Setup writes any keys you type into `settings.json`, so nothing is left to configure.
 
-Windows shows *"Windows protected your PC"* on first run because the installer is not code-signed,
-so click **More info → Run anyway**. A signing certificate is the only way around it.
+Windows shows *"Windows protected your PC"* on first run, so click **More info → Run anyway**.
+See [why Windows warns](#why-windows-warns-and-how-to-verify-the-download) if you'd rather check
+the file first.
 
 **Uninstall:** Settings → Apps → Installed apps → Squint. It asks whether to keep your API keys,
 and defaults to keeping them.
